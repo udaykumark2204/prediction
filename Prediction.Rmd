@@ -1,0 +1,117 @@
+---
+title: "Machine Learning-Prediction"
+author: "UdayKumar"
+date: "11/8/2017"
+output: html_document
+keep_md: true
+---
+## Executive Summary
+
+Human Activity Recognition - HAR - has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community (see picture below, that illustrates the increasing number of publications in HAR with wearable accelerometers), especially for the development of context-aware systems. There are many potential applications for HAR, like: elderly monitoring, life log systems for monitoring energy expenditure and for supporting weight-loss programs, and digital assistants for weight lifting exercises.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+## Data Loading
+
+```{r}
+library(caret)
+library(randomForest)
+library(gbm)
+training<-read.csv("pml-training.csv",na.strings=c('NA','#DIV/0!',''))
+testing<-read.csv("pml-testing.csv",na.strings=c('NA','#DIV/0!',''))
+dim(training)
+dim(testing)
+```
+
+## Cleaning the data
+On closer inspection, the original dataset has 160 variables (including the response variable). However, upon scanning through the summary of the dataset, the first 5 variables are unlikely to be explanatory since they are data identifiers for individual and time, and an additional 100 variables has 98% of their observations in NAs so they are highly unlikely to contain much value as well so they are also dropped.
+
+```{r}
+table(training$classe)
+NACounts <- colSums(is.na(training))
+
+remove <- names(NACounts[NACounts > 15000])
+new.trainingset <- training[,!(colnames(training) %in% remove)]
+new.trainingset<-new.trainingset[,-(1:7)]
+```
+
+## Linear discriminant analysis
+```{r results='hide'}
+set.seed(2344)
+prob <- c(0.2,0.7)
+LDA.accu <- rep(NA,length(prob))
+for(i in 1:length(prob)){
+    inTrain <- createDataPartition(new.trainingset$classe,p=prob[i],list=F)
+    TrainSet <- new.trainingset[inTrain,]
+    Validation <- new.trainingset[-inTrain,]
+    FitModel.LDA <- train(classe ~ ., method = 'lda', data = TrainSet)
+    predi <- predict(FitModel.LDA, newdata = Validation)
+    confM <- confusionMatrix(predi, Validation$classe)
+    # LDA accuracy
+    LDA.accu[i] <- confM$overall['Accuracy']
+}
+```
+## Classification trees
+
+```{r results='hide'}
+set.seed(24)
+prob <- c(0.2,0.7)
+Rpart.accu <- rep(NA,length(prob))
+for(i in 1:length(prob)){
+    inTrain <- createDataPartition(new.trainingset$classe,p=prob[i],list=F)
+    TrainSet <- new.trainingset[inTrain,]
+    Validation <- new.trainingset[-inTrain,]
+    FitModel.Rpart <- train(classe ~ ., method = 'rpart', data = TrainSet)
+    predi <- predict(FitModel.Rpart, newdata = Validation)
+    confM <- confusionMatrix(predi, Validation$classe)
+    Rpart.accu[i] <- confM$overall['Accuracy']
+}
+```
+
+## Random forests
+
+```{r results='hide'}
+set.seed(924)
+prob <- c(0.2,0.7)
+RF.accu <- rep(NA,length(prob))
+for(i in 1:length(prob)){
+    inTrain <- createDataPartition(new.trainingset$classe,p=prob[i],list=F)
+    TrainSet <- new.trainingset[inTrain,]
+    Validation <- new.trainingset[-inTrain,]
+    FitModel.RF <- train(classe ~ ., method = 'rf', data = TrainSet)
+    predi <- predict(FitModel.RF, newdata = Validation)
+    confM <- confusionMatrix(predi, Validation$classe)
+    RF.accu[i] <- confM$overall['Accuracy']
+}
+```
+
+## Generalized boosted regression models
+```{r results='hide'}
+set.seed(98924)
+prob <- c(0.2,0.7)
+GBM.accu <- rep(NA,length(prob))
+for(i in 1:length(prob)){
+    inTrain <- createDataPartition(new.trainingset$classe,p=prob[i],list=F)
+    TrainSet <- new.trainingset[inTrain,]
+    Validation <- new.trainingset[-inTrain,]
+    FitModel.GBM <- train(classe ~ ., method = 'gbm', data = TrainSet)
+    predi <- predict(FitModel.GBM, newdata = Validation)
+    confM <- confusionMatrix(predi, Validation$classe)
+    GBM.accu[i] <- confM$overall['Accuracy']
+}
+```
+
+###Comparision
+```{r}
+DF <- data.frame(prob,GBM.accu, RF.accu,Rpart.accu, LDA.accu)
+DF
+```
+
+##Prediction
+Random forest and generalized boosted model are prety accurate.
+```{r}
+predict(FitModel.RF, newdata = testing)
+```
+```{r}
+predict(FitModel.GBM, newdata = testing)
+```
